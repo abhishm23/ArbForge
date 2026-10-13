@@ -1,0 +1,1380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArbForge — Triangular Arbitrage Terminal</title>
+<style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   ArbForge Financial Terminal — Institutional Dark Mode
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root {
+  --bg-primary:    #0a0e17;
+  --bg-secondary:  #0f1520;
+  --bg-card:       #111927;
+  --bg-hover:      #1a2332;
+  --bg-input:      #0d1219;
+  --border:        #1e2a3a;
+  --border-active: #2a3f5f;
+  --text-primary:  #e1e8f0;
+  --text-secondary:#8899aa;
+  --text-dim:      #556677;
+  --green:         #00e676;
+  --green-dim:     #00c853;
+  --green-bg:      rgba(0,230,118,0.08);
+  --red:           #ff1744;
+  --red-dim:       #d50000;
+  --red-bg:        rgba(255,23,68,0.08);
+  --amber:         #ffab00;
+  --amber-bg:      rgba(255,171,0,0.08);
+  --blue:          #448aff;
+  --blue-dim:      #2962ff;
+  --cyan:          #00e5ff;
+  --purple:        #b388ff;
+  --mono:          'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
+  --sans:          'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--mono);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Header / Telemetry Bar ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--cyan);
+  letter-spacing: 2px;
+}
+
+.logo span { color: var(--text-dim); font-weight: 400; }
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.status-badge.live {
+  background: var(--green-bg);
+  color: var(--green);
+  border: 1px solid rgba(0,230,118,0.3);
+}
+
+.status-badge.syncing {
+  background: var(--amber-bg);
+  color: var(--amber);
+  border: 1px solid rgba(255,171,0,0.3);
+}
+
+.status-badge.offline {
+  background: var(--red-bg);
+  color: var(--red);
+  border: 1px solid rgba(255,23,68,0.3);
+}
+
+.pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.4; transform: scale(0.8); }
+}
+
+.header-metrics {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
+.metric {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.metric-label {
+  font-size: 9px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.metric-value {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.metric-value.highlight { color: var(--cyan); }
+.metric-value.warning   { color: var(--amber); }
+.metric-value.danger    { color: var(--red); }
+
+.clock {
+  font-size: 11px;
+  color: var(--text-dim);
+  min-width: 170px;
+  text-align: right;
+}
+
+/* ── Main Layout ─────────────────────────────────────────────────────────── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr;
+  gap: 0;
+  height: calc(100vh - 38px);
+  overflow: hidden;
+}
+
+/* ── Opportunity Radar Banner ────────────────────────────────────────────── */
+.radar-banner {
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 30px;
+}
+
+.radar-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.radar-ticker {
+  flex: 1;
+  overflow: hidden;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.radar-ticker .opp-active {
+  color: var(--green);
+  font-weight: 600;
+}
+
+.radar-ticker .opp-count {
+  color: var(--amber);
+  font-weight: 600;
+  margin-left: 8px;
+}
+
+/* ── Content Grid ────────────────────────────────────────────────────────── */
+.content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.panel {
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--text-dim);
+}
+
+.panel-badge {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+/* Scrollbar styling */
+.panel-body::-webkit-scrollbar { width: 4px; }
+.panel-body::-webkit-scrollbar-track { background: var(--bg-primary); }
+.panel-body::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 2px; }
+
+/* ── Orderbook Matrix Table ──────────────────────────────────────────────── */
+.matrix-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.matrix-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.matrix-table th {
+  padding: 6px 8px;
+  text-align: right;
+  font-weight: 600;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.matrix-table th:first-child { text-align: left; }
+
+.matrix-table td {
+  padding: 5px 8px;
+  text-align: right;
+  border-bottom: 1px solid rgba(30,42,58,0.5);
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.matrix-table td:first-child {
+  text-align: left;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.matrix-table tr:hover td { background: var(--bg-hover); }
+
+.matrix-table .bid { color: var(--green); }
+.matrix-table .ask { color: var(--red); }
+.matrix-table .qty { color: var(--text-secondary); }
+.matrix-table .spread { color: var(--amber); }
+
+.tick-flash { animation: flash 0.4s ease-out; }
+@keyframes flash {
+  0%  { background: rgba(0,229,255,0.15); }
+  100%{ background: transparent; }
+}
+
+/* ── Imbalance Bar ───────────────────────────────────────────────────────── */
+.imbalance-bar {
+  display: flex;
+  width: 60px;
+  height: 10px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-card);
+  margin-left: auto;
+}
+
+.imbalance-bid {
+  background: var(--green);
+  opacity: 0.6;
+  transition: width 0.3s ease;
+}
+
+.imbalance-ask {
+  background: var(--red);
+  opacity: 0.6;
+  transition: width 0.3s ease;
+}
+
+/* ── Arbitrage Cycle Cards ───────────────────────────────────────────────── */
+.cycle-card {
+  margin: 6px 8px;
+  padding: 10px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: border-color 0.2s ease;
+}
+
+.cycle-card:hover { border-color: var(--border-active); }
+
+.cycle-card.active { border-color: var(--green-dim); }
+.cycle-card.negative { border-color: var(--red-dim); }
+
+.cycle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cycle-id {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.cycle-yield {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+
+.cycle-yield.positive {
+  color: var(--green);
+  background: var(--green-bg);
+}
+
+.cycle-yield.negative {
+  color: var(--red);
+  background: var(--red-bg);
+}
+
+.cycle-legs {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.leg-row {
+  display: grid;
+  grid-template-columns: 22px 86px 65px 1fr 75px;
+  gap: 6px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.leg-step {
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.leg-action {
+  font-weight: 600;
+}
+
+.leg-action.buy  { color: var(--green); }
+.leg-action.sell { color: var(--red); }
+
+.leg-price { color: var(--text-secondary); text-align: right; }
+.leg-symbol { color: var(--blue); font-weight: 600; }
+
+.cycle-meta {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(30,42,58,0.5);
+}
+
+.meta-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.meta-label {
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-dim);
+}
+
+.meta-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* ── Conversion Graph Canvas ─────────────────────────────────────────────── */
+#graphCanvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Controls Panel ──────────────────────────────────────────────────────── */
+.controls {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.control-row input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+}
+
+.control-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--cyan);
+  cursor: pointer;
+}
+
+.control-value {
+  min-width: 55px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+.capital-buttons {
+  display: flex;
+  gap: 4px;
+}
+
+.capital-btn {
+  padding: 4px 10px;
+  font-size: 10px;
+  font-family: var(--mono);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.capital-btn:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-active);
+  color: var(--text-primary);
+}
+
+.capital-btn.active {
+  background: rgba(0,229,255,0.1);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+/* ── Audit Log ───────────────────────────────────────────────────────────── */
+.audit-log {
+  padding: 4px 8px;
+  font-size: 10px;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.audit-log::-webkit-scrollbar { width: 4px; }
+.audit-log::-webkit-scrollbar-track { background: var(--bg-primary); }
+.audit-log::-webkit-scrollbar-thumb { background: var(--border-active); border-radius: 2px; }
+
+.log-entry {
+  display: flex;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.log-ts { color: var(--text-dim); min-width: 80px; }
+.log-type { font-weight: 600; min-width: 50px; }
+.log-type.info  { color: var(--blue); }
+.log-type.arb   { color: var(--green); }
+.log-type.warn  { color: var(--amber); }
+.log-type.error { color: var(--red); }
+.log-msg { color: var(--text-secondary); flex: 1; }
+
+/* ── Audio toggle ────────────────────────────────────────────────────────── */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.toggle-switch {
+  position: relative;
+  width: 32px;
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.toggle-switch.on { background: var(--cyan); }
+
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--text-primary);
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch.on::after { transform: translateX(16px); }
+
+.toggle-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  .content {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto;
+  }
+  .header-metrics { gap: 10px; flex-wrap: wrap; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Header / Telemetry Bar
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="header">
+  <div class="header-left">
+    <div class="logo">ARBFORGE <span>v1.0</span></div>
+    <div class="status-badge offline" id="statusBadge">
+      <div class="pulse-dot"></div>
+      <span id="statusText">CONNECTING</span>
+    </div>
+    <a href="/docs-interactive" target="_blank" style="text-decoration:none;font-size:10px;color:var(--cyan);border:1px solid var(--border);padding:2px 8px;border-radius:3px;font-weight:600;display:inline-flex;align-items:center;gap:4px;background:rgba(0,229,255,0.06);">
+      <span>⚡</span> DOCS
+    </a>
+  </div>
+  <div class="header-metrics">
+    <div class="metric">
+      <span class="metric-label">API Latency</span>
+      <span class="metric-value" id="metricLatency">—</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Polls</span>
+      <span class="metric-value" id="metricPolls">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Pairs</span>
+      <span class="metric-value highlight" id="metricPairs">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Active Opps</span>
+      <span class="metric-value highlight" id="metricActive">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Weight 1m</span>
+      <span class="metric-value" id="metricWeight">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Uptime</span>
+      <span class="metric-value" id="metricUptime">0s</span>
+    </div>
+    <div class="clock" id="clock">—</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     Opportunity Radar Banner
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<div class="main">
+  <div class="radar-banner">
+    <span class="radar-label">⚡ Arb Radar</span>
+    <div class="radar-ticker" id="radarTicker">Scanning for triangular arbitrage opportunities…</div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       4-Panel Content Grid
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <div class="content">
+
+    <!-- Panel 1: Level-1 Orderbook Matrix -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Level-1 Orderbook Matrix</span>
+        <span class="panel-badge" style="background:var(--blue-dim);color:#fff;" id="pairCount">0 PAIRS</span>
+      </div>
+      <div class="panel-body">
+        <table class="matrix-table" id="matrixTable">
+          <thead>
+            <tr>
+              <th>Pair</th>
+              <th>Best Bid</th>
+              <th>Bid Qty</th>
+              <th>Best Ask</th>
+              <th>Ask Qty</th>
+              <th>Spread</th>
+              <th>Spread BPS</th>
+              <th>Imbalance</th>
+            </tr>
+          </thead>
+          <tbody id="matrixBody">
+            <tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:20px;">Awaiting data…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel 2: Triangular Arbitrage Cycles -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Triangular Arbitrage Cycles</span>
+        <span class="panel-badge" style="background:var(--green-dim);color:#fff;" id="cycleCount">0 / 0</span>
+      </div>
+      <div class="panel-body" id="cyclesPanel">
+        <div style="text-align:center;color:var(--text-dim);padding:20px;">Awaiting cycle evaluation…</div>
+      </div>
+    </div>
+
+    <!-- Panel 3: Directed Conversion Graph -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Directed Conversion Graph</span>
+        <span class="panel-badge" style="background:var(--purple);color:#000;">LIVE</span>
+      </div>
+      <div class="panel-body" style="padding:0;">
+        <canvas id="graphCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Panel 4: Controls & Audit Log -->
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Execution Simulator & Log</span>
+        <span class="panel-badge" style="background:var(--amber);color:#000;">CONFIG</span>
+      </div>
+      <div class="panel-body">
+        <div class="controls">
+          <!-- Yield Threshold Slider -->
+          <div class="control-group">
+            <span class="control-label">Yield Threshold</span>
+            <div class="control-row">
+              <input type="range" id="thresholdSlider" min="0.01" max="1.0" step="0.01" value="0.05">
+              <span class="control-value" id="thresholdValue">0.05%</span>
+            </div>
+          </div>
+
+          <!-- Fee Slider -->
+          <div class="control-group">
+            <span class="control-label">Taker Fee (BPS)</span>
+            <div class="control-row">
+              <input type="range" id="feeSlider" min="0" max="20" step="0.5" value="10">
+              <span class="control-value" id="feeValue">10 bps</span>
+            </div>
+          </div>
+
+          <!-- Capital Selector -->
+          <div class="control-group">
+            <span class="control-label">Initial Capital (USDT)</span>
+            <div class="capital-buttons" id="capitalBtns">
+              <button class="capital-btn" data-val="1000">$1K</button>
+              <button class="capital-btn active" data-val="10000">$10K</button>
+              <button class="capital-btn" data-val="50000">$50K</button>
+              <button class="capital-btn" data-val="100000">$100K</button>
+            </div>
+          </div>
+
+          <!-- Audio Toggle -->
+          <div class="toggle-row">
+            <div class="toggle-switch" id="audioToggle"></div>
+            <span class="toggle-label">Audio chime on opportunity</span>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--border);margin-top:8px;">
+          <div class="panel-header" style="padding:6px 12px;">
+            <span class="panel-title">Audit Log</span>
+          </div>
+          <div class="audit-log" id="auditLog">
+            <div class="log-entry"><span class="log-ts">—</span><span class="log-type info">SYS</span><span class="log-msg">Terminal initialized. Connecting to ArbForge engine…</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════════
+     JavaScript: SSE Consumer, Renderers, Graph Visualizer, Controls
+     ═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  // ── State ──────────────────────────────────────────────────────────────
+  let prevPrices = {};
+  let audioEnabled = false;
+  let selectedCapital = 10000;
+  let lastActiveSet = new Set();
+  let latestPairs = [];
+  let latestOpps = [];
+  let eventSource = null;
+  let reconnectTimer = null;
+  const MAX_LOG_ENTRIES = 40;
+
+  // ── DOM Refs ───────────────────────────────────────────────────────────
+  const $ = id => document.getElementById(id);
+  const statusBadge  = $('statusBadge');
+  const statusText   = $('statusText');
+  const metricLatency= $('metricLatency');
+  const metricPolls  = $('metricPolls');
+  const metricPairs  = $('metricPairs');
+  const metricActive = $('metricActive');
+  const metricWeight = $('metricWeight');
+  const metricUptime = $('metricUptime');
+  const clockEl      = $('clock');
+  const radarTicker  = $('radarTicker');
+  const pairCount    = $('pairCount');
+  const matrixBody   = $('matrixBody');
+  const cyclesPanel  = $('cyclesPanel');
+  const cycleCount   = $('cycleCount');
+  const auditLog     = $('auditLog');
+  const graphCanvas  = $('graphCanvas');
+  const ctx          = graphCanvas.getContext('2d');
+
+  // ── Formatting Helpers ─────────────────────────────────────────────────
+  function fmtPrice(v, decimals) {
+    if (v == null) return '—';
+    const d = decimals != null ? decimals : (v < 0.01 ? 8 : v < 1 ? 6 : v < 100 ? 4 : 2);
+    return Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  }
+
+  function fmtQty(v) {
+    if (v == null) return '—';
+    return v < 1 ? v.toFixed(6) : v < 100 ? v.toFixed(3) : v.toFixed(2);
+  }
+
+  function fmtPct(v) {
+    if (v == null) return '—';
+    return (v >= 0 ? '+' : '') + v.toFixed(4) + '%';
+  }
+
+  function fmtBps(v) {
+    if (v == null) return '—';
+    return v.toFixed(2) + ' bps';
+  }
+
+  function fmtUptime(s) {
+    if (!s) return '0s';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = Math.floor(s % 60);
+    if (h > 0) return h + 'h ' + m + 'm';
+    if (m > 0) return m + 'm ' + sec + 's';
+    return sec + 's';
+  }
+
+  function fmtUSD(v) {
+    if (v == null) return '—';
+    if (Math.abs(v) >= 1) return '$' + v.toFixed(2);
+    return '$' + v.toFixed(4);
+  }
+
+  function ts() {
+    return new Date().toISOString().substr(11, 8);
+  }
+
+  // ── Clock ──────────────────────────────────────────────────────────────
+  function updateClock() {
+    const now = new Date();
+    const utc = now.toISOString().replace('T', ' ').substr(0, 19) + ' UTC';
+    const local = now.toLocaleTimeString('en-GB');
+    clockEl.textContent = utc + ' | ' + local;
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── Audit Logger ───────────────────────────────────────────────────────
+  function addLog(type, msg) {
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    entry.innerHTML = '<span class="log-ts">' + ts() + '</span>' +
+                      '<span class="log-type ' + type + '">' + type.toUpperCase() + '</span>' +
+                      '<span class="log-msg">' + msg + '</span>';
+    auditLog.prepend(entry);
+    while (auditLog.children.length > MAX_LOG_ENTRIES) {
+      auditLog.removeChild(auditLog.lastChild);
+    }
+  }
+
+  // ── Audio Chime ────────────────────────────────────────────────────────
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  let audioCtx = null;
+
+  function playChime() {
+    if (!audioEnabled) return;
+    try {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+      osc.start(audioCtx.currentTime);
+      osc.stop(audioCtx.currentTime + 0.3);
+    } catch(e) {}
+  }
+
+  // ── Matrix Renderer ────────────────────────────────────────────────────
+  function renderMatrix(pairs) {
+    if (!pairs || !pairs.length) return;
+    pairCount.textContent = pairs.length + ' PAIRS';
+    metricPairs.textContent = pairs.length;
+
+    let html = '';
+    for (const p of pairs) {
+      const sym = p.symbol;
+      const bidChanged = prevPrices[sym + '_bid'] !== p.bid_price;
+      const askChanged = prevPrices[sym + '_ask'] !== p.ask_price;
+      const flash = (bidChanged || askChanged) ? ' class="tick-flash"' : '';
+
+      const bidQty = p.bid_qty || 0;
+      const askQty = p.ask_qty || 0;
+      const total = bidQty + askQty;
+      const bidPct = total > 0 ? (bidQty / total * 100) : 50;
+      const askPct = 100 - bidPct;
+
+      html += '<tr' + flash + '>' +
+        '<td>' + sym + '</td>' +
+        '<td class="bid">' + fmtPrice(p.bid_price) + '</td>' +
+        '<td class="qty">' + fmtQty(bidQty) + '</td>' +
+        '<td class="ask">' + fmtPrice(p.ask_price) + '</td>' +
+        '<td class="qty">' + fmtQty(askQty) + '</td>' +
+        '<td class="spread">' + fmtPrice(p.spread_abs) + '</td>' +
+        '<td class="spread">' + fmtBps(p.spread_bps_mid) + '</td>' +
+        '<td><div class="imbalance-bar">' +
+          '<div class="imbalance-bid" style="width:' + bidPct.toFixed(1) + '%"></div>' +
+          '<div class="imbalance-ask" style="width:' + askPct.toFixed(1) + '%"></div>' +
+        '</div></td>' +
+        '</tr>';
+
+      prevPrices[sym + '_bid'] = p.bid_price;
+      prevPrices[sym + '_ask'] = p.ask_price;
+    }
+    matrixBody.innerHTML = html;
+  }
+
+  // ── Cycle Card Renderer ────────────────────────────────────────────────
+  function renderCycles(opps, activeCount, scannedCount) {
+    cycleCount.textContent = activeCount + ' / ' + scannedCount;
+
+    if (!opps || !opps.length) {
+      cyclesPanel.innerHTML = '<div style="text-align:center;color:var(--text-dim);padding:20px;">No cycles evaluated yet</div>';
+      return;
+    }
+
+    // Sort: active first, then by absolute net yield descending
+    const sorted = [...opps].sort((a, b) => {
+      if (a.is_arbitrage !== b.is_arbitrage) return b.is_arbitrage ? 1 : -1;
+      return Math.abs(b.net_yield_pct) - Math.abs(a.net_yield_pct);
+    });
+
+    let html = '';
+    const newActiveSet = new Set();
+
+    for (const opp of sorted) {
+      const isPositive = opp.net_yield_pct > 0;
+      const isActive = opp.is_arbitrage;
+      const cardClass = isActive ? 'active' : (isPositive ? '' : 'negative');
+      const yieldClass = isPositive ? 'positive' : 'negative';
+
+      if (isActive) {
+        newActiveSet.add(opp.cycle_id);
+        if (!lastActiveSet.has(opp.cycle_id)) {
+          playChime();
+          addLog('arb', 'OPPORTUNITY DETECTED: ' + opp.cycle_id + ' → ' + fmtPct(opp.net_yield_pct) + ' net');
+        }
+      }
+
+      const maxExec = opp.max_executable_volume_quote || 0;
+      const profit = opp.expected_net_profit_quote || 0;
+      // Simulated profit based on selected capital
+      const simProfit = selectedCapital * (opp.net_yield_pct / 100);
+
+      let legsHtml = '';
+      if (opp.legs) {
+        for (const leg of opp.legs) {
+          const actionText = leg.action === 'BUY' ? 'BUY @ Ask' : 'SELL @ Bid';
+          const actionClass = leg.action === 'BUY' ? 'buy' : 'sell';
+          legsHtml += '<div class="leg-row">' +
+            '<span class="leg-step">L' + leg.step + '</span>' +
+            '<span class="leg-action ' + actionClass + '">' + actionText + '</span>' +
+            '<span class="leg-symbol">' + leg.symbol + '</span>' +
+            '<span class="leg-price">' + fmtPrice(leg.price) + '</span>' +
+            '<span class="qty">' + fmtQty(leg.available_qty_base) + '</span>' +
+            '</div>';
+        }
+      }
+
+      const capLabel = '$' + (selectedCapital >= 1000 ? (selectedCapital / 1000) + 'K' : selectedCapital);
+      const simProfitSign = simProfit >= 0 ? '+' : '';
+      const simColor = simProfit >= 0 ? 'var(--green)' : 'var(--red)';
+      const profitSign = profit >= 0 ? '+' : '';
+      const profitColor = profit > 0 ? 'var(--green)' : (profit < 0 ? 'var(--red)' : 'var(--text-secondary)');
+
+      html += '<div class="cycle-card ' + cardClass + '">' +
+        '<div class="cycle-header">' +
+          '<span class="cycle-id">' + opp.cycle_id + '</span>' +
+          '<span class="cycle-yield ' + yieldClass + '">' + fmtPct(opp.net_yield_pct) + '</span>' +
+        '</div>' +
+        '<div class="cycle-legs">' + legsHtml + '</div>' +
+        '<div class="cycle-meta">' +
+          '<div class="meta-item"><span class="meta-label">Gross Yield</span><span class="meta-value">' + fmtPct(opp.gross_yield_pct) + '</span></div>' +
+          '<div class="meta-item"><span class="meta-label">Max Execute</span><span class="meta-value">' + fmtUSD(maxExec) + '</span></div>' +
+          '<div class="meta-item"><span class="meta-label">Est. Profit</span><span class="meta-value" style="color:' + profitColor + '">' + profitSign + fmtUSD(profit) + '</span></div>' +
+          '<div class="meta-item"><span class="meta-label">Sim PnL (' + capLabel + ')</span><span class="meta-value" style="color:' + simColor + '">' + simProfitSign + fmtUSD(simProfit) + '</span></div>' +
+        '</div>' +
+        '</div>';
+    }
+
+    lastActiveSet = newActiveSet;
+    cyclesPanel.innerHTML = html;
+  }
+
+  // ── Radar Banner ───────────────────────────────────────────────────────
+  function renderRadar(opps, activeCount) {
+    if (activeCount > 0) {
+      const active = opps.filter(o => o.is_arbitrage);
+      const best = active.reduce((a, b) => Math.abs(b.net_yield_pct) > Math.abs(a.net_yield_pct) ? b : a, active[0]);
+      radarTicker.innerHTML = '<span class="opp-active">🔥 ' + best.cycle_id + ' @ ' + fmtPct(best.net_yield_pct) + ' net yield</span>' +
+                              '<span class="opp-count">' + activeCount + ' active cycle(s)</span>';
+    } else {
+      radarTicker.innerHTML = 'No active arbitrage opportunities above threshold. Scanning…';
+    }
+  }
+
+  // ── Directed Graph Visualizer ──────────────────────────────────────────
+  const GRAPH_NODES = {
+    USDT: { label: 'USDT', color: '#00e676' },
+    BTC:  { label: 'BTC',  color: '#ffab00' },
+    ETH:  { label: 'ETH',  color: '#448aff' },
+    SOL:  { label: 'SOL',  color: '#b388ff' },
+    BNB:  { label: 'BNB',  color: '#ff9100' }
+  };
+
+  const GRAPH_EDGES = [
+    { from: 'USDT', to: 'BTC',  sym: 'BTCUSDT' },
+    { from: 'USDT', to: 'ETH',  sym: 'ETHUSDT' },
+    { from: 'USDT', to: 'SOL',  sym: 'SOLUSDT' },
+    { from: 'USDT', to: 'BNB',  sym: 'BNBUSDT' },
+    { from: 'BTC',  to: 'ETH',  sym: 'ETHBTC' },
+    { from: 'BTC',  to: 'SOL',  sym: 'SOLBTC' },
+    { from: 'BTC',  to: 'BNB',  sym: 'BNBBTC' },
+  ];
+
+  let graphPositions = {};
+  let activeArbs = [];
+  let animPhase = 0;
+
+  function layoutGraph(w, h) {
+    if (!w || !h) {
+      const rect = graphCanvas.getBoundingClientRect();
+      w = rect.width || 300;
+      h = rect.height || 300;
+    }
+    const cx = w / 2;
+    const cy = h / 2;
+    const r = Math.min(w, h) * 0.33;
+
+    const names = Object.keys(GRAPH_NODES);
+    names.forEach((name, i) => {
+      const angle = -Math.PI / 2 + (2 * Math.PI * i) / names.length;
+      graphPositions[name] = {
+        x: cx + r * Math.cos(angle),
+        y: cy + r * Math.sin(angle)
+      };
+    });
+  }
+
+  function drawGraph(pairs, opps) {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = graphCanvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const targetWidth = Math.round(rect.width * dpr);
+    const targetHeight = Math.round(rect.height * dpr);
+
+    if (graphCanvas.width !== targetWidth || graphCanvas.height !== targetHeight) {
+      graphCanvas.width = targetWidth;
+      graphCanvas.height = targetHeight;
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+    layoutGraph(rect.width, rect.height);
+
+    const w = rect.width;
+    const h = rect.height;
+    ctx.clearRect(0, 0, w, h);
+
+    // Build active cycle edges set
+    const activeEdges = new Set();
+    if (opps) {
+      for (const opp of opps) {
+        if (opp.is_arbitrage && opp.legs) {
+          for (const leg of opp.legs) {
+            activeEdges.add(leg.from_asset + '-' + leg.to_asset);
+          }
+        }
+      }
+    }
+
+    // Draw edges
+    for (const edge of GRAPH_EDGES) {
+      const from = graphPositions[edge.from];
+      const to   = graphPositions[edge.to];
+      if (!from || !to) continue;
+
+      // Draw bidirectional
+      for (const dir of [{f: edge.from, t: edge.to}, {f: edge.to, t: edge.from}]) {
+        const p1 = graphPositions[dir.f];
+        const p2 = graphPositions[dir.t];
+        if (!p1 || !p2) continue;
+        const key = dir.f + '-' + dir.t;
+        const isActive = activeEdges.has(key);
+
+        // Offset for bidirectional
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len === 0) continue;
+        const nx = -dy / len * 4;
+        const ny = dx / len * 4;
+
+        ctx.beginPath();
+        ctx.moveTo(p1.x + nx, p1.y + ny);
+        ctx.lineTo(p2.x + nx, p2.y + ny);
+        ctx.strokeStyle = isActive ? '#00e676' : 'rgba(30,42,58,0.8)';
+        ctx.lineWidth = isActive ? 2 : 1;
+        ctx.stroke();
+
+        // Arrowhead
+        const arrowLen = 8;
+        const ax = p2.x + nx - dx/len*20;
+        const ay = p2.y + ny - dy/len*20;
+        const angle = Math.atan2(dy, dx);
+        ctx.beginPath();
+        ctx.moveTo(ax + arrowLen*Math.cos(angle-0.5), ay + arrowLen*Math.sin(angle-0.5));
+        ctx.lineTo(ax + arrowLen*Math.cos(angle+Math.PI), ay + arrowLen*Math.sin(angle+Math.PI));
+        ctx.lineTo(ax + arrowLen*Math.cos(angle+0.5), ay + arrowLen*Math.sin(angle+0.5));
+        ctx.fillStyle = isActive ? '#00e676' : 'rgba(30,42,58,0.6)';
+        ctx.fill();
+
+        // Animated pulse on active edges with glowing particle
+        if (isActive) {
+          const t = (animPhase % 100) / 100;
+          const px = p1.x + nx + dx * t;
+          const py = p1.y + ny + dy * t;
+          ctx.save();
+          ctx.shadowColor = '#00e676';
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = '#00e676';
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+    }
+
+    // Draw nodes
+    for (const [name, node] of Object.entries(GRAPH_NODES)) {
+      const pos = graphPositions[name];
+      if (!pos) continue;
+
+      const hasActive = activeEdges.has(name + '-') || [...activeEdges].some(e => e.startsWith(name + '-') || e.endsWith('-' + name));
+
+      // Node circle
+      ctx.beginPath();
+      ctx.arc(pos.x, pos.y, 20, 0, Math.PI * 2);
+      ctx.fillStyle = hasActive ? 'rgba(0,230,118,0.15)' : 'rgba(17,25,39,0.9)';
+      ctx.fill();
+      ctx.strokeStyle = node.color;
+      ctx.lineWidth = hasActive ? 2.5 : 1.5;
+      ctx.stroke();
+
+      // Node label
+      ctx.font = '700 11px JetBrains Mono, Consolas, monospace';
+      ctx.fillStyle = node.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(node.label, pos.x, pos.y);
+    }
+
+    animPhase = (animPhase + 0.8) % 100;
+  }
+
+  // ── Telemetry Updater ──────────────────────────────────────────────────
+  function updateTelemetry(telemetry) {
+    if (!telemetry) return;
+    const lat = telemetry.latency_ms;
+    metricLatency.textContent = lat != null ? lat.toFixed(1) + 'ms' : '—';
+    metricLatency.className = 'metric-value' + (lat > 500 ? ' danger' : lat > 200 ? ' warning' : '');
+
+    metricPolls.textContent = telemetry.poll_count || 0;
+    metricWeight.textContent = telemetry.used_weight_1m || 0;
+    metricWeight.className = 'metric-value' + (telemetry.used_weight_1m > 800 ? ' warning' : '');
+    metricUptime.textContent = fmtUptime(telemetry.uptime_s);
+  }
+
+  // ── Status Badge ───────────────────────────────────────────────────────
+  function setStatus(state) {
+    statusBadge.className = 'status-badge ' + state;
+    statusText.textContent = state.toUpperCase();
+  }
+
+  // ── SSE Connection ─────────────────────────────────────────────────────
+  function connect() {
+    if (eventSource) {
+      eventSource.close();
+    }
+
+    addLog('info', 'Connecting to SSE stream…');
+    eventSource = new EventSource('/api/stream');
+
+    eventSource.onopen = function() {
+      setStatus('live');
+      addLog('info', 'SSE stream connected');
+    };
+
+    eventSource.onmessage = function(event) {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'error') {
+          addLog('error', data.message);
+          return;
+        }
+
+        setStatus('live');
+
+        // Update matrix
+        renderMatrix(data.pairs);
+
+        // Update cycles
+        renderCycles(data.opportunities, data.active_count, data.scanned_count);
+        metricActive.textContent = data.active_count || 0;
+        metricActive.className = 'metric-value' + (data.active_count > 0 ? ' highlight' : '');
+
+        // Update radar
+        renderRadar(data.opportunities, data.active_count);
+
+        // Update telemetry
+        updateTelemetry(data.telemetry);
+
+        // Update latest market data for graph animation
+        latestPairs = data.pairs || [];
+        latestOpps = data.opportunities || [];
+
+      } catch (e) {
+        addLog('warn', 'Parse error: ' + e.message);
+      }
+    };
+
+    eventSource.onerror = function() {
+      setStatus('syncing');
+      addLog('warn', 'SSE connection lost. Reconnecting in 3s…');
+      eventSource.close();
+      eventSource = null;
+      clearTimeout(reconnectTimer);
+      reconnectTimer = setTimeout(connect, 3000);
+    };
+  }
+
+  // ── Fallback Polling (if SSE fails) ────────────────────────────────────
+  async function pollFallback() {
+    try {
+      const [matrixRes, cyclesRes] = await Promise.all([
+        fetch('/api/orderbook-matrix').then(r => r.json()),
+        fetch('/api/triangular-cycles').then(r => r.json())
+      ]);
+
+      setStatus('live');
+      renderMatrix(matrixRes.pairs);
+      renderCycles(cyclesRes.opportunities, cyclesRes.active_count, cyclesRes.scanned_count);
+      metricActive.textContent = cyclesRes.active_count || 0;
+      renderRadar(cyclesRes.opportunities, cyclesRes.active_count);
+
+      if (matrixRes.latency_ms != null) {
+        metricLatency.textContent = matrixRes.latency_ms.toFixed(1) + 'ms';
+      }
+      metricPolls.textContent = matrixRes.poll_count || 0;
+      metricPairs.textContent = matrixRes.pairs_count || 0;
+
+      latestPairs = matrixRes.pairs || [];
+      latestOpps = cyclesRes.opportunities || [];
+    } catch(e) {
+      setStatus('offline');
+    }
+  }
+
+  // ── Controls ───────────────────────────────────────────────────────────
+  const thresholdSlider = $('thresholdSlider');
+  const thresholdValue  = $('thresholdValue');
+  const feeSlider       = $('feeSlider');
+  const feeValue        = $('feeValue');
+  const audioToggle     = $('audioToggle');
+  const capitalBtns     = $('capitalBtns');
+
+  thresholdSlider.addEventListener('input', function() {
+    thresholdValue.textContent = parseFloat(this.value).toFixed(2) + '%';
+  });
+  thresholdSlider.addEventListener('change', function() {
+    const val = parseFloat(this.value);
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threshold_pct: val })
+    }).then(() => addLog('info', 'Threshold updated: ' + val.toFixed(2) + '%'))
+      .catch(e => addLog('error', 'Config update failed'));
+  });
+
+  feeSlider.addEventListener('input', function() {
+    feeValue.textContent = parseFloat(this.value).toFixed(1) + ' bps';
+  });
+  feeSlider.addEventListener('change', function() {
+    const val = parseFloat(this.value);
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fee_bps: val })
+    }).then(() => addLog('info', 'Taker fee updated: ' + val.toFixed(1) + ' bps'))
+      .catch(e => addLog('error', 'Config update failed'));
+  });
+
+  audioToggle.addEventListener('click', function() {
+    audioEnabled = !audioEnabled;
+    this.classList.toggle('on', audioEnabled);
+    addLog('info', 'Audio chime ' + (audioEnabled ? 'enabled' : 'disabled'));
+    if (audioEnabled && !audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  });
+
+  capitalBtns.addEventListener('click', function(e) {
+    const btn = e.target.closest('.capital-btn');
+    if (!btn) return;
+    document.querySelectorAll('.capital-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedCapital = parseFloat(btn.dataset.val);
+    fetch('/api/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ initial_capital: selectedCapital })
+    }).then(() => addLog('info', 'Capital set: $' + selectedCapital.toLocaleString()))
+      .catch(e => addLog('error', 'Config update failed'));
+  });
+
+  // ── Graph Resize Handler ───────────────────────────────────────────────
+  window.addEventListener('resize', () => {
+    const rect = graphCanvas.getBoundingClientRect();
+    if (rect.width && rect.height) {
+      layoutGraph(rect.width, rect.height);
+    }
+  });
+
+  // ── Continuous 60fps Graph Animation Loop ─────────────────────────────
+  function startGraphAnimation() {
+    function frame() {
+      drawGraph(latestPairs, latestOpps);
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+
+  // ── Initialize ─────────────────────────────────────────────────────────
+  startGraphAnimation();
+  connect();
+
+  // Fallback: if SSE doesn't deliver in 5s, start REST polling
+  setTimeout(() => {
+    if (!eventSource || eventSource.readyState !== EventSource.OPEN) {
+      addLog('warn', 'SSE unavailable — falling back to REST polling');
+      setInterval(pollFallback, 2500);
+      pollFallback();
+    }
+  }, 5000);
+
+})();
+</script>
+</body>
+</html>
